@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 secret.py
+*.png
+file_info.json
