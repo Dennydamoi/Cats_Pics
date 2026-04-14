@@ -5,3 +5,4 @@ __pycache__/
 secret.py
 *.png
 file_info.json
+*.jpg
