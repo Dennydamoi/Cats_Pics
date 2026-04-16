@@ -54,7 +54,7 @@ class dogs_API:
     
     def __init__(self, breed):
         self.breed = breed
-        self.url = f'https://dog.ceo/api/breed/{breed}/'
+        self.url = f'https://dog.ceo/api/breed/{self.breed}/'
         self.sub_breed_data = {}
         self._list_files = []
     
@@ -131,38 +131,45 @@ class dogs_API:
 
     def create_pics(self):
         if self.sub_breed_data:
-            for s_breed in self.sub_breed_data.values():
-                with open(f'{s_breed["file_name"]}', 'wb') as f:
+            for e, s_breed in enumerate(self.sub_breed_data.values()):
+                f_name = f'{self.breed}_{list(self.sub_breed_data.keys())[e]}_{s_breed["file_name"]}'
+                with open(f_name, 'wb') as f:
                     f.write(s_breed['img'])
-                self._list_files.append(f'{s_breed["file_name"]}')
+                self._list_files.append(f_name)
 
 
 def dz():
-    _text = input('Введите текст:')
+    #variables
+    _text = input('Введите текст для котика:')
+    _group = input('Введите название группы:')
+    _breed = input('Введите название породы песеля')
     
-    # get pic
+    # get cat pic
     cat_call = cats_API()
     pic = cat_call.get_pic_w_text(_text)
     
-    # save pic
+    # save cat pic
     with open(f'{_text}.png', 'wb') as f:
         f.write(pic)
     
-    # create folder
+    # get dogs_sub_breeds
+    dog_call = dogs_API(_breed)
+    dog_call.get_subbreed()
+    
+    #get dog pics
+    dog_call.create_pics()
+    
+    # create folders
     yd_call = yd_API(yd_token)
-    yd_call.create_folder('Python 148')
+    yd_call.create_folder(_group)
+    yd_call.create_folder(_breed)
     
     # work with files
-    file_info = yd_call.add_file(f'Python 148/{_text}', f'{_text}.png')
+    file_info = yd_call.add_file(f'{_group}/{_text}', f'{_text}.png')
     
-    dog_call = dogs_API('hound')
-    dog_call.get_subbreed()
-    dog_call.create_pics()
-    yd_call.create_folder('hound')
     for file in dog_call._list_files:
-        print(f'{file.removesuffix(".jpg")}')
-        yd_call.add_file(f'hound/{file.removesuffix(".jpg")}', f'{file}')
-    
+        # print(f'{file.removesuffix(".jpg")}')
+        yd_call.add_file(f'{_breed}/{file.removesuffix(".jpg")}', f'{file}')
     
     with open('file_info.json', 'w', encoding='utf-8') as f:
         json.dump(file_info, f, indent=2, ensure_ascii=False)
@@ -172,16 +179,5 @@ def dz():
 
 def main():
     dz()
-    # dog_call = dogs_API('hound')
-    # result = dog_call.get_subbreed()
-    # print(f'{len(dog_call.sub_breed_data)}')
-    # for breed_name, data in dog_call.sub_breed_data.items():
-    #     print(f"\n{breed_name}:")
-    #     print(f"  Имя файла: {data.get('file_name', 'НЕТ')}")
-    #     print(f"  Размер img: {len(data.get('img', b''))} байт")
-    #     print(f"  Первые 50 байт: {data.get('img', b'')[:50]}")
-    
-    # print(dog_call.sub_breed_data.keys())
-    
 
 main()
