@@ -1,9 +1,9 @@
 import requests
-from secret import yd_token
+import time
 import json
-import os
 import io
-from pprint import pprint
+from secret import yd_token
+from tqdm import tqdm
 
 def create_url(url, method):
     return f'{url}{method}'
@@ -18,6 +18,14 @@ def handle_exceptions(e, response=None, YD=False):
     elif isinstance(e, requests.exceptions.RequestException):
         return f'Ошибка соединения: {e}'
     return 'Неизвестная ошибка'
+
+
+def format_size(bytes):
+    for uni in ['B', 'KB', 'MB', 'GB']:
+        if bytes < 1024.0:
+            return f'{bytes:.1f}{uni}'
+        bytes /= 1024.0
+    return f'{bytes:.1f} TB'
 
 
 class cats_API:
@@ -84,44 +92,42 @@ class yd_API:
         except requests.exceptions.RequestException as e:
             return handle_exceptions(e, up_resp)
         
-        self._file_links.append(f'{create_url(self.url, path)}')
+        self._file_links.append(f'{create_url("disk:/", path)}')
         
         return
     
-    def create_info_json(self):
+    
+    def get_last_upl(self, range):
         resp = None
         file_info = {}
+        params = {
+            'limit': range
+        }
         
-        for path in self._file_links:
-            params = {'path': path}
-            
-            try:
-                resp = requests.get(
-                    path,
-                    headers=self.headers,
-                    params=params,
-                    timeout=10
-                )
-                resp.raise_for_status()
-            
-            except requests.exceptions.RequestException as e:
-                print(f'{handle_exceptions(e, resp)}')
-                continue
-            
-            data = resp.json()
-            file_info['name'] = {
-                'path': data['path'],
-                'size': data['size'],
-                'url': path
+        try:
+            resp = requests.get(
+                create_url(self.url, f'resources/last-uploaded'),
+                params= params,
+                headers= self.headers,
+                timeout= 10
+            )
+            resp.raise_for_status()
+        
+        except requests.exceptions.RequestException as e:
+            return handle_exceptions(e, resp)
+        
+        data = resp.json()['items']
+        
+        for item in data:
+            file_info[f'{item["name"]}'] = {
+                'path': item['path'],
+                'size': format_size(item['size'])
             }
         
         with open('file_info.json', 'w') as f:
             json.dump(file_info, f, ensure_ascii=False, indent=2)
         
         return
-    
-    def get_last_upl(self):
-        
 
 
 class dogs_API:
@@ -191,48 +197,83 @@ class dogs_API:
                 except requests.exceptions.RequestException as e:
                     print(f'Ошибка соединение: {e}')
                     continue
-            
-            return f'Скачано {len(self.sub_breed_data)} из {len(sub_breed_list)} под пород'
         
         except requests.exceptions.RequestException as e:
             return handle_exceptions(e, resp)
+        
+        return f'Скачано {len(self.sub_breed_data)} из {len(sub_breed_list)} под пород'
 
 
 def dz():
+    print("=" * 60)
+    print("РЕЗЕРВНОЕ КОПИРОВАНИЕ НА ЯНДЕКС.ДИСК")
+    print("=" * 60)
+    
     #variables
     _text = input('Введите текст для котика: ')
+    print()
     _group = input('Введите название группы: ')
+    print()
     _breed = input('Введите название породы песеля: ')
+    print()
     
     # get cat pic
+    print('\n Загрузка картинки котика')
     cat_call = cats_API()
     pic = cat_call.get_pic_w_text(_text)
     
     # save cat pic obj
     pic_obj = io.BytesIO(pic)
+    print('Котик готов')
     
     # get dogs_sub_breeds
+    print(f'\n Загрузка данных о породе "{_breed}"')
     dog_call = dogs_API(_breed)
-    dog_call.get_subbreed()
+    result = dog_call.get_subbreed()
+    
+    if not result:
+        print('Ошибка получения подпород')
+        return
+    
+    print(result)
     
     # create folders
+    print('\n Подключение к Яндекс Диску')
     yd_call = yd_API(yd_token)
+    print(f'Создание папки {_group}')
     yd_call.create_folder(_group)
+    print(f'Создание папки {_breed}')
     yd_call.create_folder(_breed)
     
     # work with YD files
     # cat pic upl
+    print('\n Загрузга файлов...')
+    print('\n Загрузка котика...')
     yd_call.add_file(f'{_group}/{_text}', pic_obj)
+    print('Котик загружен')
     
     # dogs pic upl
-    for s_breed in dog_call.sub_breed_data.values():
-        yd_call.add_file(f'{_breed}/{s_breed["file_name"]}', s_breed['img'])
-
-    # yd_call.create_info_json()
+    sub_breeds = list(dog_call.sub_breed_data.values())
+    print(f'\n Загрузка {len(sub_breeds)} фото песелей')
     
+    for s_breed in tqdm(sub_breeds, desc='Загрузка', unit='файл'):
+        result = yd_call.add_file(f'{_breed}/{s_breed["file_name"]}', s_breed['img'])
+        time.sleep(0.1)
+    
+    print(f'\n Загружено {len(sub_breeds)} файлов')
+    
+    # yd_call.create_info_json()
+    print('\n Создаю file_info.json')
+    yd_call.get_last_upl(len(yd_call._file_links))
+    
+    print("\n" + "=" * 60)
+    print("РЕЗЕРВНОЕ КОПИРОВАНИЕ ЗАВЕРШЕНО")
+    print("=" * 60)
+    print(f"Всего загружено: {len(yd_call._file_links)} файлов")
+    print(f"Информация: file_info.json")
 
 
 def main():
     dz()
-
+    
 main()
