@@ -9,7 +9,7 @@ def create_url(url, method):
     return f'{url}{method}'
 
 
-def handle_exceptions(e, response=None, YD=False):
+def handle_exceptions(e, response=None):
     if isinstance(e, requests.exceptions.Timeout):
         return 'Таймаут'
     elif isinstance(e, requests.exceptions.HTTPError):
@@ -195,7 +195,7 @@ class dogs_API:
                     print(f'Ошибка: {resp.status_code}')
                     continue
                 except requests.exceptions.RequestException as e:
-                    print(f'Ошибка соединение: {e}')
+                    print(f'Ошибка соединения: {e}')
                     continue
         
         except requests.exceptions.RequestException as e:
